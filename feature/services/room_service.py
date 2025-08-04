@@ -203,6 +203,7 @@ class RoomService:
 
         except Exception as e:
             raise ValueError(f"Error getting join requests: {str(e)}")
+
     @staticmethod
     async def invite_users(
             db: Session,
@@ -219,17 +220,21 @@ class RoomService:
             if not room:
                 return False, "Room not found", None
 
-            # Check if sender is an admin in the room
+            # For public rooms, no invitations needed - users can join directly
+            if room.privacy_type == RoomPrivacy.PUBLIC:
+                return False, "Public rooms don't require invitations - users can join directly", None
+
+            # For private rooms, check if sender is any approved member
             sender_participant = db.query(RoomParticipant).filter(
                 and_(
                     RoomParticipant.room_id == room_id,
                     RoomParticipant.user_id == sender_id,
-                    RoomParticipant.is_admin == True
+                    RoomParticipant.status == "approved"
                 )
             ).first()
 
             if not sender_participant:
-                return False, "Only room admins can send invitations", None
+                return False, "Only room members can send invitations", None
 
             # Check if room is active
             if not room.is_active():
@@ -275,8 +280,7 @@ class RoomService:
 
         except Exception as e:
             db.rollback()
-            return False, f"Error inviting users: {str(e)}", None
-    @staticmethod
+            return False, f"Error inviting users: {str(e)}", None    @staticmethod
     async def get_pending_invitations(
             db: Session,
             user_id: int,
@@ -478,14 +482,32 @@ class RoomService:
             if existing_participant:
                 if existing_participant.status == "banned":
                     return False, "You are banned from this room", None
-                return False, "Already a participant in this room", room
+                elif existing_participant.status == "approved":
+                    return False, "Already a participant in this room", room
+                elif existing_participant.status == "pending" and room.privacy_type == RoomPrivacy.PRIVATE:
+                    # For private rooms with pending invitation, update status based on auto_approve
+                    status = "approved" if room.auto_approve_participants else "pending"
+                    if status == "approved":
+                        existing_participant.status = "approved"
+                        existing_participant.last_active_at = datetime.utcnow()
+                        db.commit()
+                        db.refresh(room)
+                        return True, "Successfully joined room", room
+                    else:
+                        return False, "Your join request is pending admin approval", room
+                elif existing_participant.status == "pending" and room.privacy_type == RoomPrivacy.PUBLIC:
+                    return False, "Your request is already pending", room
 
-            # For private rooms, status is pending until approved
-            # For public rooms with auto-approve, status is approved
-            status = "approved" if (
-                    room.privacy_type == RoomPrivacy.PUBLIC and
-                    room.auto_approve_participants
-            ) else "pending"
+            # Handle joining based on room privacy
+            if room.privacy_type == RoomPrivacy.PUBLIC:
+                # Public rooms: anyone can join, respect auto_approve setting
+                status = "approved" if room.auto_approve_participants else "pending"
+                success_message = "Successfully joined room" if room.auto_approve_participants else "Join request sent successfully"
+            else:
+                # Private rooms: only users without existing records can request to join
+                # This will create a pending request that needs admin approval
+                status = "pending"
+                success_message = "Join request sent to room admins"
 
             # Create new participant
             participant = RoomParticipant(
@@ -503,8 +525,6 @@ class RoomService:
             db.commit()
             db.refresh(room)
 
-            success_message = "Successfully joined room" if status == "approved" else \
-                "Join request sent successfully"
             return True, success_message, room
 
         except Exception as e:

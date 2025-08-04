@@ -250,14 +250,21 @@ async def activate_room(
         data=room
     )
 
+
 @router.post("/{room_id}/invite", response_model=RoomResponse)
 async def invite_users(
-    room_id: str,
-    invitation: RoomInvitation,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_dependency)
+        room_id: str,
+        invitation: RoomInvitation,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db_dependency)
 ):
-    """Invite users to a room."""
+    """
+    Invite users to a private room.
+
+    - Only works for private rooms (public rooms don't need invitations)
+    - Any approved member of the room can send invitations
+    - Invited users will have 'pending' status until they join or are approved
+    """
     success, message, room = await RoomService.invite_users(
         db,
         room_id,
@@ -276,7 +283,6 @@ async def invite_users(
         message=message,
         data=room
     )
-
 @router.post("/{room_id}/archive", response_model=RoomResponse)
 async def archive_room(
     room_id: str,
