@@ -341,7 +341,7 @@ class RoomService:
                 # Use subquery for better performance
                 participant_subquery = db.query(RoomParticipant.room_id).filter(
                     RoomParticipant.user_id == user_id,
-                    RoomParticipant.status.in_(["approved", "pending"])
+                    RoomParticipant.status == "approved"
                 ).subquery()
                 
                 query = query.filter(
@@ -416,6 +416,27 @@ class RoomService:
                 else:
                     # If user has no friends, only show their own rooms
                     query = query.filter(Room.owner_id == user_id)
+
+            # PRIVACY FILTER: Apply privacy-based access control
+            # Private rooms should only be visible to owner and participants
+            # Public rooms are visible to everyone
+            if not filter_params.my_rooms:
+                # Create subquery for rooms where user is a participant (any status)
+                participant_rooms_subquery = db.query(RoomParticipant.room_id).filter(
+                    RoomParticipant.user_id == user_id
+                ).subquery()
+
+                # Show rooms where:
+                # 1. Room is PUBLIC, OR
+                # 2. User is the owner, OR
+                # 3. User is a participant (has any status - pending, approved, etc.)
+                query = query.filter(
+                    or_(
+                        Room.privacy_type == RoomPrivacy.PUBLIC,
+                        Room.owner_id == user_id,
+                        Room.id.in_(participant_rooms_subquery)
+                    )
+                )
 
             # Add distinct to avoid duplicates when using joins
             if filter_params.my_rooms or filter_params.friends_only:

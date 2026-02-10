@@ -13,7 +13,12 @@ if settings.DATABASE_URL.startswith("sqlite"):
     )
 else:
     print("database started with nottt sql lite ")
-    url = settings.DATABASE_URL % quote(settings.DATABASE_PASSWORD)
+    # Check if DATABASE_URL contains %s placeholder for password
+    if '%s' in settings.DATABASE_URL:
+        url = settings.DATABASE_URL % quote(settings.DATABASE_PASSWORD)
+    else:
+        # Use DATABASE_URL as-is if no placeholder exists
+        url = settings.DATABASE_URL
     engine = create_engine(url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
