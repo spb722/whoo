@@ -28,8 +28,8 @@ from app.services.user_service import UserService
 from app.core.security import create_jwt_token
 from feature.controllers.otp_controller import router as otp_router
 from feature.controllers.friend_controller import router as friend_router
-
-# Add this with your other app.include_router calls
+from feature.controllers.video_controller import router as video_router, internal_router as video_internal_router
+from feature.services.stitch_scheduler import start_scheduler
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -78,10 +78,21 @@ app.include_router(
     prefix=settings.API_V1_STR,
     tags=["Friends"]
 )
+app.include_router(
+    video_router,
+    prefix=settings.API_V1_STR,
+    tags=["videos"]
+)
+app.include_router(
+    video_internal_router,
+    prefix=settings.API_V1_STR,
+    tags=["internal"]
+)
 
 @app.on_event("startup")
 async def startup_event():
     create_tables()
+    start_scheduler()
 
 
 @app.post("/token", response_model=AuthResponse)

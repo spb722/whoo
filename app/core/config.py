@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = Field(default="http://localhost:3000")
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
 
+    # Media / Video
+    MEDIA_ROOT: str = Field(default="/var/whoo/media")
+    MEDIA_BASE_URL: str = Field(default="https://api.whoo.app/media")
+    WORKER_API_KEY: str = Field(default="")
+    UPLOAD_MAX_BYTES: int = Field(default=50 * 1024 * 1024)
+
     class Config:
         case_sensitive = True
         env_file = ".env"

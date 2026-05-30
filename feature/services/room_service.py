@@ -512,6 +512,12 @@ class RoomService:
                         existing_participant.status = "approved"
                         existing_participant.last_active_at = datetime.utcnow()
                         db.commit()
+                        approved_count = db.query(RoomParticipant).filter(
+                            RoomParticipant.room_id == room_id,
+                            RoomParticipant.status == "approved"
+                        ).count()
+                        room.expected_uploader_count = approved_count
+                        db.commit()
                         db.refresh(room)
                         return True, "Successfully joined room", room
                     else:
@@ -543,6 +549,12 @@ class RoomService:
 
             # Update room's last activity
             room.last_activity = datetime.utcnow()
+            if status == "approved":
+                approved_count = db.query(RoomParticipant).filter(
+                    RoomParticipant.room_id == room_id,
+                    RoomParticipant.status == "approved"
+                ).count()
+                room.expected_uploader_count = approved_count
             db.commit()
             db.refresh(room)
 
@@ -619,8 +631,17 @@ class RoomService:
             participant.updated_at = datetime.utcnow()
             db.commit()
 
-            # Get updated room
+            # Keep expected_uploader_count in sync with approved participants
             room = db.query(Room).filter(Room.id == room_id).first()
+            if room:
+                approved_count = db.query(RoomParticipant).filter(
+                    RoomParticipant.room_id == room_id,
+                    RoomParticipant.status == "approved"
+                ).count()
+                room.expected_uploader_count = approved_count
+                db.commit()
+                db.refresh(room)
+
             return True, "Participant status updated successfully", room
 
         except Exception as e:

@@ -52,6 +52,8 @@ class Room(Base):
     status = Column(SQLEnum(RoomStatus), default=RoomStatus.PENDING)
     activation_time = Column(DateTime(timezone=True), nullable=False)
     expiration_time = Column(DateTime(timezone=True), nullable=False)
+    upload_deadline = Column(DateTime(timezone=True), nullable=True)
+    expected_uploader_count = Column(Integer, nullable=True)
 
     # Tracking and Metadata
     last_activity = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
